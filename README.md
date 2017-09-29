@@ -1,48 +1,86 @@
 ![preview](http://alloyteam.github.io/AlloyFinger/alloyfinger.png)
 
+# Install
+
+You can install it via npm:
+
+```html
+npm install alloyfinger
+```
+
 # Usage
 
+### AlloyCrop
+
+* [https://github.com/AlloyTeam/AlloyCrop](https://github.com/AlloyTeam/AlloyCrop)
+
+### Omi Version:
+
+* [omi-finger](https://github.com/AlloyTeam/omix/tree/master/plugins/omi-finger)
+
 ```js
-new AlloyFinger(element, {
-    touchStart: function () {
-    },
-    touchMove: function () {
-    },
-    touchEnd: function () {
-    },
-    touchCancel: function () {
-    },
-    multipointStart: function () {
-    },
+    render() {
+        return  `
+        <div>
+            <div omi-finger ref="touchArea" onTap="handleTap"  onSwipe="handleSwipe" >
+                Tap or Swipe Me!
+            </div>
+        </div>
+        `;
+    }
+```
+
+### Pure JS:
+```js
+var af = new AlloyFinger(element, {
+    touchStart: function () { },
+    touchMove: function () { },
+    touchEnd:  function () { },
+    touchCancel: function () { },
+    multipointStart: function () { },
+    multipointEnd: function () { },
+    tap: function () { },
+    doubleTap: function () { },
+    longTap: function () { },
+    singleTap: function () { },
     rotate: function (evt) {
         console.log(evt.angle);
     },
     pinch: function (evt) {
-        console.log(evt.scale);
-    },
-    multipointEnd: function () {
+        console.log(evt.zoom);
     },
     pressMove: function (evt) {
         console.log(evt.deltaX);
         console.log(evt.deltaY);
     },
-    tap: function (evt) {
-    },
-    doubleTap: function (evt) {
-    },
-    longTap: function (evt) {
-    },
     swipe: function (evt) {
         console.log("swipe" + evt.direction);
-    },
-    singleTap: function (evt) {
     }
 });
+
+/**
+ * this method can also add or remove the event handler
+ */
+var onTap = function() {};
+
+af.on('tap', onTap);
+af.on('touchStart', function() {});
+
+af.off('tap', onTap);
+
+/**
+ * this method can destroy the instance
+ */
+af = af.destroy();
 ```
 
 ### React Version:
 
 ```js
+import AlloyFinger from 'alloyfinger/dist/react/AlloyFinger';
+
+// ...
+
 render() {
     return (
         <AlloyFinger
@@ -61,18 +99,10 @@ render() {
 }
 ```
 
+# Thanks and Donate
 
-# Install
-
-You can install it via npm:
-
-```html
-npm install alloyfinger
-```
-
-# Who is using AlloyFinger?
-
-![preview](http://sqimg.qq.com/qq_product_operations/im/qqlogo/imlogo.png)
+* [transformjs](http://alloyteam.github.io/AlloyTouch/transformjs/)
+* [Donate to AlloyFinger](http://alloyteam.github.io/donate.html)
 
 # License
 This content is released under the [MIT](http://opensource.org/licenses/MIT) License.

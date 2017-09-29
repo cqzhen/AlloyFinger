@@ -1,8 +1,8 @@
-﻿/* AlloyFinger v0.1.2
+/* AlloyFinger v0.1.10
  * By dntzhang
  * Github: https://github.com/AlloyTeam/AlloyFinger
  */
-;(function() {
+; (function () {
     function getLen(v) {
         return Math.sqrt(v.x * v.x + v.y * v.y);
     }
@@ -31,170 +31,295 @@
 
         return angle * 180 / Math.PI;
     }
+
+    var HandlerAdmin = function(el) {
+        this.handlers = [];
+        this.el = el;
+    };
+
+    HandlerAdmin.prototype.add = function(handler) {
+        this.handlers.push(handler);
+    }
+
+    HandlerAdmin.prototype.del = function(handler) {
+        if(!handler) this.handlers = [];
+
+        for(var i=this.handlers.length; i>=0; i--) {
+            if(this.handlers[i] === handler) {
+                this.handlers.splice(i, 1);
+            }
+        }
+    }
+
+    HandlerAdmin.prototype.dispatch = function() {
+        for(var i=0,len=this.handlers.length; i<len; i++) {
+            var handler = this.handlers[i];
+            if(typeof handler === 'function') handler.apply(this.el, arguments);
+        }
+    }
+
+    function wrapFunc(el, handler) {
+        var handlerAdmin = new HandlerAdmin(el);
+        handlerAdmin.add(handler);
+
+        return handlerAdmin;
+    }
+
     var AlloyFinger = function (el, option) {
 
-        el.addEventListener("touchstart", this.start.bind(this), false);
-        el.addEventListener("touchmove", this.move.bind(this), false);
-        el.addEventListener("touchend", this.end.bind(this), false);
-        el.addEventListener("touchcancel",this.cancel.bind(this),false);
+        this.element = typeof el == 'string' ? document.querySelector(el) : el;
+
+        this.start = this.start.bind(this);
+        this.move = this.move.bind(this);
+        this.end = this.end.bind(this);
+        this.cancel = this.cancel.bind(this);
+        this.element.addEventListener("touchstart", this.start, false);
+        this.element.addEventListener("touchmove", this.move, false);
+        this.element.addEventListener("touchend", this.end, false);
+        this.element.addEventListener("touchcancel", this.cancel, false);
 
         this.preV = { x: null, y: null };
         this.pinchStartLen = null;
-        this.scale = 1;
+        this.zoom = 1;
         this.isDoubleTap = false;
-        this.rotate = option.rotate || function () { };
-        this.touchStart = option.touchStart || function () { };
-        this.multipointStart = option.multipointStart || function () { };
-        this.multipointEnd=option.multipointEnd||function(){};
-        this.pinch = option.pinch || function () { };
-        this.swipe = option.swipe || function () { };
-        this.tap = option.tap || function () { };
-        this.doubleTap = option.doubleTap || function () { };
-        this.longTap = option.longTap || function () { };
-        this.singleTap = option.singleTap || function () { };
-        this.pressMove = option.pressMove || function () { };
-        this.touchMove = option.touchMove || function () { };
-        this.touchEnd = option.touchEnd || function () { };
-        this.touchCancel = option.touchCancel || function () { };
+
+        var noop = function () { };
+
+        this.rotate = wrapFunc(this.element, option.rotate || noop);
+        this.touchStart = wrapFunc(this.element, option.touchStart || noop);
+        this.multipointStart = wrapFunc(this.element, option.multipointStart || noop);
+        this.multipointEnd = wrapFunc(this.element, option.multipointEnd || noop);
+        this.pinch = wrapFunc(this.element, option.pinch || noop);
+        this.swipe = wrapFunc(this.element, option.swipe || noop);
+        this.tap = wrapFunc(this.element, option.tap || noop);
+        this.doubleTap = wrapFunc(this.element, option.doubleTap || noop);
+        this.longTap = wrapFunc(this.element, option.longTap || noop);
+        this.singleTap = wrapFunc(this.element, option.singleTap || noop);
+        this.pressMove = wrapFunc(this.element, option.pressMove || noop);
+        this.twoFingerPressMove = wrapFunc(this.element, option.twoFingerPressMove || noop);
+        this.touchMove = wrapFunc(this.element, option.touchMove || noop);
+        this.touchEnd = wrapFunc(this.element, option.touchEnd || noop);
+        this.touchCancel = wrapFunc(this.element, option.touchCancel || noop);
+
+        this._cancelAllHandler = this.cancelAll.bind(this);
+        window.removeEventListener('scroll', this._cancelAllHandler);
+
+        window.addEventListener('scroll', this._cancelAllHandler);
 
         this.delta = null;
         this.last = null;
         this.now = null;
         this.tapTimeout = null;
-        this.touchTimeout = null;
+        this.singleTapTimeout = null;
         this.longTapTimeout = null;
-        this.swipeTimeout=null;
+        this.swipeTimeout = null;
         this.x1 = this.x2 = this.y1 = this.y2 = null;
-        this.preTapPosition={x:null,y:null};
+        this.preTapPosition = { x: null, y: null };
     };
 
     AlloyFinger.prototype = {
         start: function (evt) {
-            if(!evt.touches)return;
+            if (!evt.touches) return;
             this.now = Date.now();
             this.x1 = evt.touches[0].pageX;
             this.y1 = evt.touches[0].pageY;
             this.delta = this.now - (this.last || this.now);
-            this.touchStart(evt);
-            if(this.preTapPosition.x!==null){
-                this.isDoubleTap = (this.delta > 0 && this.delta <= 250&&Math.abs(this.preTapPosition.x-this.x1)<30&&Math.abs(this.preTapPosition.y-this.y1)<30);
+            this.touchStart.dispatch(evt);
+            if (this.preTapPosition.x !== null) {
+                this.isDoubleTap = (this.delta > 0 && this.delta <= 250 && Math.abs(this.preTapPosition.x - this.x1) < 30 && Math.abs(this.preTapPosition.y - this.y1) < 30);
             }
-            this.preTapPosition.x=this.x1;
-            this.preTapPosition.y=this.y1;
+            this.preTapPosition.x = this.x1;
+            this.preTapPosition.y = this.y1;
             this.last = this.now;
             var preV = this.preV,
                 len = evt.touches.length;
             if (len > 1) {
+                this._cancelLongTap();
+                this._cancelSingleTap();
                 var v = { x: evt.touches[1].pageX - this.x1, y: evt.touches[1].pageY - this.y1 };
                 preV.x = v.x;
                 preV.y = v.y;
                 this.pinchStartLen = getLen(preV);
-                this.multipointStart(evt);
+                this.multipointStart.dispatch(evt);
             }
-            this.longTapTimeout = setTimeout(function(){
-                this.longTap(evt);
+            this._preventTap = false;
+            this.longTapTimeout = setTimeout(function () {
+                this.longTap.dispatch(evt);
+                this._preventTap = true;
             }.bind(this), 750);
         },
         move: function (evt) {
-            if(!evt.touches)return;
+            if (!evt.touches) return;
             var preV = this.preV,
                 len = evt.touches.length,
                 currentX = evt.touches[0].pageX,
                 currentY = evt.touches[0].pageY;
-            this.isDoubleTap=false;
+            this.isDoubleTap = false;
             if (len > 1) {
+                var sCurrentX = evt.touches[1].pageX,
+                    sCurrentY = evt.touches[1].pageY
                 var v = { x: evt.touches[1].pageX - currentX, y: evt.touches[1].pageY - currentY };
 
                 if (preV.x !== null) {
                     if (this.pinchStartLen > 0) {
-                        evt.scale = getLen(v) / this.pinchStartLen;
-                        this.pinch(evt);
+                        evt.zoom = getLen(v) / this.pinchStartLen;
+                        this.pinch.dispatch(evt);
                     }
 
                     evt.angle = getRotateAngle(v, preV);
-                    this.rotate(evt);
+                    this.rotate.dispatch(evt);
                 }
                 preV.x = v.x;
                 preV.y = v.y;
+
+                if (this.x2 !== null && this.sx2 !== null) {
+                    evt.deltaX = (currentX - this.x2 + sCurrentX - this.sx2) / 2;
+                    evt.deltaY = (currentY - this.y2 + sCurrentY - this.sy2) / 2;
+                } else {
+                    evt.deltaX = 0;
+                    evt.deltaY = 0;
+                }
+                this.twoFingerPressMove.dispatch(evt);
+
+                this.sx2 = sCurrentX;
+                this.sy2 = sCurrentY;
             } else {
                 if (this.x2 !== null) {
                     evt.deltaX = currentX - this.x2;
                     evt.deltaY = currentY - this.y2;
 
-                }else{
+                } else {
                     evt.deltaX = 0;
                     evt.deltaY = 0;
                 }
-                this.pressMove(evt);
+                
+                
+                this.pressMove.dispatch(evt);
             }
 
-            this.touchMove(evt);
+            this.touchMove.dispatch(evt);
 
             this._cancelLongTap();
             this.x2 = currentX;
             this.y2 = currentY;
-            if(evt.touches.length > 1) {
+            
+            if (len > 1) {
                 evt.preventDefault();
             }
         },
         end: function (evt) {
-            if(!evt.changedTouches)return;
+            if (!evt.changedTouches) return;
             this._cancelLongTap();
             var self = this;
-            if( evt.touches.length<2){
-                this.multipointEnd(evt);
+            if (evt.touches.length < 2) {
+                this.multipointEnd.dispatch(evt);
             }
-            this.touchEnd(evt);
+
             //swipe
             if ((this.x2 && Math.abs(this.x1 - this.x2) > 30) ||
-                (this.y2 && Math.abs(this.preV.y - this.y2) > 30)) {
+                (this.y2 && Math.abs(this.y1 - this.y2) > 30)) {
                 evt.direction = this._swipeDirection(this.x1, this.x2, this.y1, this.y2);
                 this.swipeTimeout = setTimeout(function () {
-                    self.swipe(evt);
+                    self.swipe.dispatch(evt);
 
                 }, 0)
             } else {
                 this.tapTimeout = setTimeout(function () {
-                    self.tap(evt);
+                    if(!self._preventTap){
+                        self.tap.dispatch(evt);
+                    }
                     // trigger double tap immediately
                     if (self.isDoubleTap) {
-                        self.doubleTap(evt);
-                        clearTimeout(self.touchTimeout);
+                        self.doubleTap.dispatch(evt);
+                        clearTimeout(self.singleTapTimeout);
                         self.isDoubleTap = false;
-                    }else{
-                        self.touchTimeout=setTimeout(function(){
-                            self.singleTap(evt);
-                        },250);
                     }
                 }, 0)
+
+                if (!self.isDoubleTap) {
+                    self.singleTapTimeout = setTimeout(function () {
+                        self.singleTap.dispatch(evt);
+                    }, 250);
+                }
             }
+
+            this.touchEnd.dispatch(evt);
 
             this.preV.x = 0;
             this.preV.y = 0;
-            this.scale = 1;
+            this.zoom = 1;
             this.pinchStartLen = null;
             this.x1 = this.x2 = this.y1 = this.y2 = null;
         },
-        cancel:function(evt){
-            clearTimeout(this.touchTimeout);
-            clearInterval(this.tapTimeout);
-            clearInterval(this.longTapTimeout);
-            clearInterval(this.swipeTimeout);
-            this.touchCancel(evt);
+        cancelAll: function () {
+            this._preventTap = true
+            clearTimeout(this.singleTapTimeout);
+            clearTimeout(this.tapTimeout);
+            clearTimeout(this.longTapTimeout);
+            clearTimeout(this.swipeTimeout);
+        },
+        cancel: function (evt) {
+            this.cancelAll()
+            this.touchCancel.dispatch(evt);
         },
         _cancelLongTap: function () {
             clearTimeout(this.longTapTimeout);
         },
+        _cancelSingleTap: function () {
+            clearTimeout(this.singleTapTimeout);
+        },
         _swipeDirection: function (x1, x2, y1, y2) {
             return Math.abs(x1 - x2) >= Math.abs(y1 - y2) ? (x1 - x2 > 0 ? 'Left' : 'Right') : (y1 - y2 > 0 ? 'Up' : 'Down')
+        },
+
+        on: function(evt, handler) {
+            if(this[evt]) {
+                this[evt].add(handler);
+            }
+        },
+
+        off: function(evt, handler) {
+            if(this[evt]) {
+                this[evt].del(handler);
+            }
+        },
+
+        destroy: function() {
+            if(this.singleTapTimeout) clearTimeout(this.singleTapTimeout);
+            if(this.tapTimeout) clearTimeout(this.tapTimeout);
+            if(this.longTapTimeout) clearTimeout(this.longTapTimeout);
+            if(this.swipeTimeout) clearTimeout(this.swipeTimeout);
+
+            this.element.removeEventListener("touchstart", this.start);
+            this.element.removeEventListener("touchmove", this.move);
+            this.element.removeEventListener("touchend", this.end);
+            this.element.removeEventListener("touchcancel", this.cancel);
+
+            this.rotate.del();
+            this.touchStart.del();
+            this.multipointStart.del();
+            this.multipointEnd.del();
+            this.pinch.del();
+            this.swipe.del();
+            this.tap.del();
+            this.doubleTap.del();
+            this.longTap.del();
+            this.singleTap.del();
+            this.pressMove.del();
+            this.twoFingerPressMove.del()
+            this.touchMove.del();
+            this.touchEnd.del();
+            this.touchCancel.del();
+
+            this.preV = this.pinchStartLen = this.zoom = this.isDoubleTap = this.delta = this.last = this.now = this.tapTimeout = this.singleTapTimeout = this.longTapTimeout = this.swipeTimeout = this.x1 = this.x2 = this.y1 = this.y2 = this.preTapPosition = this.rotate = this.touchStart = this.multipointStart = this.multipointEnd = this.pinch = this.swipe = this.tap = this.doubleTap = this.longTap = this.singleTap = this.pressMove = this.touchMove = this.touchEnd = this.touchCancel = this.twoFingerPressMove = null;
+
+            return null;
         }
-
-
     };
 
     if (typeof module !== 'undefined' && typeof exports === 'object') {
         module.exports = AlloyFinger;
-    }else {
+    } else {
         window.AlloyFinger = AlloyFinger;
     }
 })();
